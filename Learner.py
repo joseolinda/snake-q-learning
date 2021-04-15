@@ -1,3 +1,4 @@
+import time
 import random
 import json
 
@@ -18,10 +19,17 @@ class Learner(object):
         self.display_height = display_height
         self.block_size = block_size
 
+        # Recompensa extra
+        self.recompensa_extra = 0
+        self.recompensa_tamanho = 0
+
         # Learning parameters
         self.epsilon = 0.1
         self.lr = 0.7
         self.discount = .5
+
+        # Stats
+        self.stats = self.LoadStats()
 
         # State/Action history
         self.qvalues = self.LoadQvalues()
@@ -40,12 +48,21 @@ class Learner(object):
 
     def LoadQvalues(self, path="qvalues.json"):
         with open(path, "r") as f:
-            qvalues = json.load(f)
-        return qvalues
+            stats = json.load(f)
+        return stats  
 
     def SaveQvalues(self, path="qvalues.json"):
         with open(path, "w") as f:
             json.dump(self.qvalues, f)
+
+    def LoadStats(self, path="game_stats.json"):
+        with open(path, "r") as f:
+            stats = json.load(f)
+        return stats              
+
+    def SaveStats(self, path="game_stats.json"):
+        with open(path, "w") as f:
+            json.dump(self.stats, f)        
             
     def act(self, snake, food):
         state = self._GetState(snake, food)
@@ -68,12 +85,18 @@ class Learner(object):
     
     def UpdateQValues(self, reason):
         history = self.history[::-1]
+
         for i, h in enumerate(history[:-1]):
             if reason: # Snake Died -> Negative reward
                 sN = history[0]['state']
                 aN = history[0]['action']
                 state_str = self._GetStateStr(sN)
-                reward = -1
+
+                if reason == "Tail":
+                    reward = -2
+                else:      
+                    reward = -1
+
                 self.qvalues[state_str][aN] = (1-self.lr) * self.qvalues[state_str][aN] + self.lr * reward # Bellman equation - there is no future state since game is over
                 reason = None
             else:
@@ -88,9 +111,13 @@ class Learner(object):
                 y2 = s1.distance[1] # y distance at previous state
                 
                 if s0.food != s1.food: # Snake ate a food, positive reward
-                    reward = 1
+                    reward = self.recompensa_tamanho + 1
+                    self.recompensa_tamanho = 0
                 elif (abs(x1) > abs(x2) or abs(y1) > abs(y2)): # Snake is closer to the food, positive reward
                     reward = 1
+                elif self.recompensa_extra != 0:
+                    reward = 1
+                    self.recompensa_extra = 0    
                 else:
                     reward = -1 # Snake is further from the food, negative reward
                     
@@ -100,6 +127,10 @@ class Learner(object):
 
 
     def _GetState(self, snake, food):
+
+        if len(snake) > 20:
+            self.recompensa_tamanho += 1
+
         snake_head = snake[-1]
         dist_x = food[0] - snake_head[0]
         dist_y = food[1] - snake_head[1]

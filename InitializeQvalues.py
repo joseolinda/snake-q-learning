@@ -13,3 +13,8 @@ for i in widths:
 
 with open("qvalues.json", "w") as f:
 	json.dump(states, f)
+
+
+game_stats = [{"game_count": 0, "score": 0, "reason": None }]
+with open("game_stats.json", "w") as f:
+	json.dump(game_stats, f)

@@ -15,8 +15,8 @@ BLOCK_SIZE = 10
 DIS_WIDTH = 600
 DIS_HEIGHT = 400
 
-QVALUES_N = 100
-FRAMESPEED = 50000
+QVALUES_N = 10
+FRAMESPEED = 500
 
 #%% Game 
 
@@ -41,9 +41,18 @@ def GameLoop():
 
     dead = False
     reason = None
+    danger = False # Perigo de atingir a calda
+
     while not dead:
         # Get action from agent
         action = learner.act(snake_list, (foodx,foody))
+
+        # Mudar sentido da ação em caso de perigo
+        mudar_acao = EmPerigo(x1, y1, snake_list, action)
+        if mudar_acao:
+            action = mudar_acao
+            learner.recompensa_extra = 1
+
         if action == "left":
             x1_change = -BLOCK_SIZE
             y1_change = 0
@@ -110,6 +119,36 @@ def DrawSnake(snake_list):
     for x in snake_list:
         pygame.draw.rect(dis, BLACK, [x[0], x[1], BLOCK_SIZE, BLOCK_SIZE])
 
+def EmPerigo(p_x1, p_y1, snake_list, action):
+    x1_change = p_x1
+    y1_change = p_y1
+    
+    new_action = "left"
+
+    if action == "left":
+        x1_change += -BLOCK_SIZE
+        y1_change += 0
+        new_action = "up"
+    elif action == "right":
+        x1_change += BLOCK_SIZE
+        y1_change += 0
+        new_action = "down"
+    elif action == "up":
+        y1_change += -BLOCK_SIZE
+        x1_change += 0
+        new_action = "left"
+    elif action == "down":
+        y1_change += BLOCK_SIZE
+        x1_change += 0
+        new_action = "right"
+
+    head = (x1_change, y1_change)    
+
+    if head in snake_list[:-1]:
+        return action
+
+    return False    
+
 
 
 #%%
@@ -124,7 +163,10 @@ while True:
     else:
         learner.epsilon = .1
     score, reason = GameLoop()
-    print(f"Games: {game_count}; Score: {score}; Reason: {reason}") # Output results of each game to console to monitor as agent is training
+    
+    learner.stats.append({"game_count": game_count, "score": score, "reason": reason })
+    learner.SaveStats()
+
     game_count += 1
     if game_count % QVALUES_N == 0: # Save qvalues every qvalue_dump_n games
         print("Save Qvals")
